@@ -13,5 +13,5 @@ cd ..
 
 ## Verify installation
 ```
-python -m overcooked_interface.test
+python -m overcooked_interface.test_interface
 ```
