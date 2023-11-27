@@ -32,6 +32,8 @@ env_config = {
 
 
 class OvercookedEnvPettingZoo(ParallelEnv):
+    metadata = {"name": "overcooked"}
+
     def __init__(self, timesteps: int = 400, map_name: str = None):
         env_config["horizon"] = timesteps
         if map_name is not None:
