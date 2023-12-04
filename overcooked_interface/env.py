@@ -34,8 +34,10 @@ env_config = {
 class OvercookedEnvPettingZoo(ParallelEnv):
     metadata = {"name": "overcooked"}
 
-    def __init__(self, timesteps: int = 400, map_name: str = None):
-        env_config["horizon"] = timesteps
+    def __init__(
+        self, timesteps: int = 400, map_name: str = None, flatten_obs: bool = False
+    ):
+        self.max_cycles = env_config["horizon"] = timesteps
         if map_name is not None:
             env_config["map_name"] = map_name
 
@@ -49,10 +51,11 @@ class OvercookedEnvPettingZoo(ParallelEnv):
             "featurize_state_mdp": base_env.featurize_state_mdp,
         }[env_config["featurize_fn"]]
 
-        self.agents = ["agent_0", "agent_1"]
-        self.possible_agents = ["agent_0", "agent_1"]
+        self.agents = [0, 1]
+        self.possible_agents = [0, 1]
         self.base_env = base_env
 
+        self.flatten_obs = flatten_obs
         self._observation_space = self._setup_observation_space()
         self.observation_spaces = {
             agent: self.observation_space(agent) for agent in self.agents
@@ -91,7 +94,8 @@ class OvercookedEnvPettingZoo(ParallelEnv):
             Observation is potentially different for each agent
             """
             return {
-                agent: self.featurize_fn(obs)[i] for i, agent in enumerate(self.agents)
+                agent: self.observe(self.featurize_fn(obs)[i])
+                for i, agent in enumerate(self.agents)
             }
 
         def create_r_shaped_dict(reward, info):
@@ -120,7 +124,10 @@ class OvercookedEnvPettingZoo(ParallelEnv):
         # when an environment terminates/truncates, PettingZoo wants all agents removed, so during reset we re-add them
         self.agents = self.possible_agents[:]
         # return the obsevations as dict
-        obs_dict = {agent: self.featurize_fn(dummy_state)[0] for agent in self.agents}
+        obs_dict = {
+            agent: self.observe(self.featurize_fn(dummy_state)[0])
+            for agent in self.agents
+        }
         return obs_dict, None
 
     def render(self):
@@ -150,6 +157,16 @@ class OvercookedEnvPettingZoo(ParallelEnv):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         obs_shape = self.featurize_fn(dummy_state)[0].shape
+        if not self.flatten_obs:
+            high = np.ones(obs_shape) * float("inf")
+            low = np.zeros(obs_shape)
+            return Box(low, high, dtype=np.float32)
+        obs_shape = (np.prod(np.array(obs_shape)),)
         high = np.ones(obs_shape) * float("inf")
         low = np.zeros(obs_shape)
         return Box(low, high, dtype=np.float32)
+
+    def observe(self, observation):
+        if self.flatten_obs:
+            return np.reshape(observation, (-1,))
+        return observation
